@@ -12,7 +12,7 @@ class SimulatedFlightPriceProvider(FlightPriceProvider):
         price: Decimal | None = None,
         airline: str = "Simulated Air",
     ) -> None:
-        self._price = price if price is not None else Decimal("2199.90")
+        self._price = price if price is not None else Decimal("2799.90")
         self._airline = airline
 
     @property
