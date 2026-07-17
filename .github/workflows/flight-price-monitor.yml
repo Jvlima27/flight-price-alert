@@ -1,0 +1,77 @@
+name: Flight Price Monitor
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "17 */4 * * *"
+      timezone: "America/Sao_Paulo"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flight-price-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Check flight prices
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      FLIGHT_PROVIDER: serpapi
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+        with:
+          version: "0.11.29"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install project
+        run: uv sync --locked --dev
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          if [ -z "$SERPAPI_API_KEY" ]; then
+            echo "::error::SERPAPI_API_KEY is not configured."
+            exit 1
+          fi
+
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::error::DISCORD_WEBHOOK_URL is not configured."
+            exit 1
+          fi
+
+      - name: Restore price history
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: flight-price-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            flight-price-state-
+
+      - name: Run flight price monitor
+        run: uv run flight-alert
+
+      - name: Save price history
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: flight-price-state-${{ github.run_id }}-${{ github.run_attempt }}
