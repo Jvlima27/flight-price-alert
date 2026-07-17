@@ -10,6 +10,12 @@ from flight_alert.notifications import (
     NotificationError,
     PriceAlertNotifier,
 )
+from flight_alert.providers import (
+    FlightPriceProvider,
+    ProviderError,
+    SerpApiFlightPriceProvider,
+    SimulatedFlightPriceProvider,
+)
 
 
 def configure_logging() -> None:
@@ -19,8 +25,35 @@ def configure_logging() -> None:
     )
 
 
+def create_provider() -> FlightPriceProvider:
+    provider_name = (
+        os.getenv(
+            "FLIGHT_PROVIDER",
+            "simulated",
+        )
+        .strip()
+        .lower()
+    )
+
+    if provider_name == "simulated":
+        return SimulatedFlightPriceProvider()
+
+    if provider_name == "serpapi":
+        api_key = os.getenv("SERPAPI_API_KEY", "").strip()
+
+        if not api_key:
+            raise ConfigurationError("SERPAPI_API_KEY is required when FLIGHT_PROVIDER=serpapi.")
+
+        return SerpApiFlightPriceProvider(api_key=api_key)
+
+    raise ConfigurationError(f"Unsupported FLIGHT_PROVIDER: '{provider_name}'.")
+
+
 def create_notifier() -> PriceAlertNotifier | None:
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+    webhook_url = os.getenv(
+        "DISCORD_WEBHOOK_URL",
+        "",
+    ).strip()
 
     if not webhook_url:
         logging.getLogger(__name__).warning(
@@ -36,8 +69,15 @@ def main() -> None:
     load_dotenv()
 
     try:
-        Application(notifier=create_notifier()).run()
-    except (ConfigurationError, NotificationError) as exc:
+        Application(
+            provider=create_provider(),
+            notifier=create_notifier(),
+        ).run()
+    except (
+        ConfigurationError,
+        NotificationError,
+        ProviderError,
+    ) as exc:
         logging.getLogger(__name__).error("%s", exc)
         raise SystemExit(1) from exc
 

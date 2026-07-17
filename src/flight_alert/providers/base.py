@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from flight_alert.models import PriceResult, Route
 
 
+class ProviderError(RuntimeError):
+    """Raised when a price provider cannot complete a search."""
+
+
 class FlightPriceProvider(ABC):
     """Base interface for flight price providers."""
 
