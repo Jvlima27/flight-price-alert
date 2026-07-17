@@ -6,6 +6,8 @@ from pathlib import Path
 
 from flight_alert.models import PriceResult, Route
 
+from datetime import datetime, timezone
+
 CENTS_MULTIPLIER = Decimal("100")
 INTEGER_PRECISION = Decimal("1")
 MONEY_PRECISION = Decimal("0.01")
@@ -46,6 +48,27 @@ class SQLitePriceRepository:
                 CREATE INDEX IF NOT EXISTS
                 idx_price_history_route_checked_at
                 ON price_history (route_key, checked_at DESC)
+                """
+            )
+
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alert_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    route_key TEXT NOT NULL,
+                    price_cents INTEGER NOT NULL,
+                    channel TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    sent_at TEXT NOT NULL
+                )
+                """
+            )
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                idx_alert_history_route_sent_at
+                ON alert_history (route_key, sent_at DESC)
                 """
             )
 
@@ -135,6 +158,73 @@ class SQLitePriceRepository:
                 """
                 SELECT COUNT(*)
                 FROM price_history
+                WHERE route_key = ?
+                """,
+                (self._create_route_key(route),),
+            ).fetchone()
+
+        return int(row[0])
+
+    def save_alert(
+        self,
+        result: PriceResult,
+        channel: str,
+        reason: str,
+    ) -> None:
+        """Record a successfully sent price alert."""
+
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO alert_history (
+                    route_key,
+                    price_cents,
+                    channel,
+                    reason,
+                    sent_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    self._create_route_key(result.route),
+                    self._to_cents(result.price),
+                    channel,
+                    reason,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+
+    def get_latest_alert_price(
+        self,
+        route: Route,
+    ) -> Decimal | None:
+        """Return the price used in the latest sent alert."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT price_cents
+                FROM alert_history
+                WHERE route_key = ?
+                ORDER BY sent_at DESC, id DESC
+                LIMIT 1
+                """,
+                (self._create_route_key(route),),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._from_cents(row[0])
+
+    def count_alerts(self, route: Route) -> int:
+        """Return the number of alerts sent for a route."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM alert_history
                 WHERE route_key = ?
                 """,
                 (self._create_route_key(route),),

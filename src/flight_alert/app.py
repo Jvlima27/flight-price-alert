@@ -4,6 +4,7 @@ from pathlib import Path
 from flight_alert.config import load_routes
 from flight_alert.database import SQLitePriceRepository
 from flight_alert.models import (
+    AlertDecision,
     PriceAnalysis,
     PriceHistoryAnalysis,
     PriceStatus,
@@ -13,7 +14,11 @@ from flight_alert.providers import (
     FlightPriceProvider,
     SimulatedFlightPriceProvider,
 )
-from flight_alert.services import analyze_price, analyze_price_history
+from flight_alert.services import (
+    analyze_price,
+    analyze_price_history,
+    decide_alert,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +55,7 @@ class Application:
 
             previous_price = self.repository.get_latest_price(route)
             previous_lowest_price = self.repository.get_lowest_price(route)
+            last_alerted_price = self.repository.get_latest_alert_price(route)
 
             result = self.provider.search(route)
 
@@ -59,26 +65,38 @@ class Application:
                 previous_price=previous_price,
                 previous_lowest_price=previous_lowest_price,
             )
+            alert_decision = decide_alert(
+                price_analysis=price_analysis,
+                history_analysis=history_analysis,
+                last_alerted_price=last_alerted_price,
+                minimum_alert_drop=route.minimum_alert_drop,
+            )
 
             self.repository.save(result)
 
             self._log_price_analysis(price_analysis)
             self._log_history_analysis(history_analysis)
-            self._send_alert_if_required(
+            self._process_alert(
+                decision=alert_decision,
                 price_analysis=price_analysis,
                 history_analysis=history_analysis,
             )
 
-    def _send_alert_if_required(
+    def _process_alert(
         self,
+        decision: AlertDecision,
         price_analysis: PriceAnalysis,
         history_analysis: PriceHistoryAnalysis,
     ) -> None:
-        if not price_analysis.should_alert:
+        if not decision.should_notify:
+            logger.info(
+                "Notification suppressed. Reason: %s.",
+                decision.reason.value,
+            )
             return
 
         if self.notifier is None:
-            logger.warning("The alert condition was met, but no notifier is configured.")
+            logger.warning("An alert should be sent, but no notifier is configured.")
             return
 
         self.notifier.send(
@@ -86,10 +104,21 @@ class Application:
             history_analysis=history_analysis,
         )
 
-        logger.info("Price alert sent successfully.")
+        self.repository.save_alert(
+            result=price_analysis.result,
+            channel=self.notifier.name,
+            reason=decision.reason.value,
+        )
+
+        logger.info(
+            "Price alert sent successfully. Reason: %s.",
+            decision.reason.value,
+        )
 
     @staticmethod
-    def _log_price_analysis(analysis: PriceAnalysis) -> None:
+    def _log_price_analysis(
+        analysis: PriceAnalysis,
+    ) -> None:
         result = analysis.result
         route = result.route
 
@@ -112,7 +141,7 @@ class Application:
             return
 
         logger.info(
-            "Price reached the target. Savings: R$ %s (%s%%). Target alert required.",
+            "Price reached the target. Savings: R$ %s (%s%%).",
             f"{analysis.difference:.2f}",
             f"{analysis.difference_percentage:.2f}",
         )

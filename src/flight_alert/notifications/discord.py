@@ -25,6 +25,10 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
         self.webhook_url = webhook_url.strip()
         self.timeout_seconds = timeout_seconds
 
+    @property
+    def name(self) -> str:
+        return "discord"
+
     def send(
         self,
         price_analysis: PriceAnalysis,

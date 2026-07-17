@@ -54,6 +54,7 @@ def _parse_route(raw_route: Any, index: int) -> Route:
             return_date=(date.fromisoformat(str(return_date_value)) if return_date_value else None),
             target_price=Decimal(str(raw_route["target_price"])),
             direct_only=direct_only,
+            minimum_alert_drop=Decimal(str(raw_route.get("minimum_alert_drop", "50.00"))),
         )
     except KeyError as exc:
         missing_field = exc.args[0]
