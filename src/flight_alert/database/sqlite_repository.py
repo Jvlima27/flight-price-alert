@@ -1,0 +1,185 @@
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
+
+from flight_alert.models import PriceResult, Route
+
+CENTS_MULTIPLIER = Decimal("100")
+INTEGER_PRECISION = Decimal("1")
+MONEY_PRECISION = Decimal("0.01")
+
+
+class SQLitePriceRepository:
+    """Store and retrieve flight price history using SQLite."""
+
+    def __init__(self, database_path: Path) -> None:
+        self.database_path = database_path
+
+    def initialize(self) -> None:
+        """Create the database structure when it does not exist."""
+
+        with self._connection() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    route_key TEXT NOT NULL,
+                    origin TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    departure_date TEXT NOT NULL,
+                    return_date TEXT,
+                    direct_only INTEGER NOT NULL,
+                    target_price_cents INTEGER NOT NULL,
+                    price_cents INTEGER NOT NULL,
+                    airline TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    booking_url TEXT,
+                    checked_at TEXT NOT NULL
+                )
+                """
+            )
+
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                idx_price_history_route_checked_at
+                ON price_history (route_key, checked_at DESC)
+                """
+            )
+
+    def save(self, result: PriceResult) -> None:
+        """Save a price result in the history."""
+
+        route = result.route
+
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO price_history (
+                    route_key,
+                    origin,
+                    destination,
+                    departure_date,
+                    return_date,
+                    direct_only,
+                    target_price_cents,
+                    price_cents,
+                    airline,
+                    source,
+                    booking_url,
+                    checked_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    self._create_route_key(route),
+                    route.origin,
+                    route.destination,
+                    route.departure_date.isoformat(),
+                    (route.return_date.isoformat() if route.return_date is not None else None),
+                    int(route.direct_only),
+                    self._to_cents(route.target_price),
+                    self._to_cents(result.price),
+                    result.airline,
+                    result.source,
+                    result.booking_url,
+                    result.checked_at.isoformat(),
+                ),
+            )
+
+    def get_latest_price(self, route: Route) -> Decimal | None:
+        """Return the most recently recorded price for a route."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT price_cents
+                FROM price_history
+                WHERE route_key = ?
+                ORDER BY checked_at DESC, id DESC
+                LIMIT 1
+                """,
+                (self._create_route_key(route),),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return self._from_cents(row[0])
+
+    def get_lowest_price(self, route: Route) -> Decimal | None:
+        """Return the lowest previously recorded price for a route."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT MIN(price_cents)
+                FROM price_history
+                WHERE route_key = ?
+                """,
+                (self._create_route_key(route),),
+            ).fetchone()
+
+        if row is None or row[0] is None:
+            return None
+
+        return self._from_cents(row[0])
+
+    def count(self, route: Route) -> int:
+        """Return the number of saved results for a route."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM price_history
+                WHERE route_key = ?
+                """,
+                (self._create_route_key(route),),
+            ).fetchone()
+
+        return int(row[0])
+
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+
+        connection = sqlite3.connect(self.database_path)
+
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _create_route_key(route: Route) -> str:
+        return_date = route.return_date.isoformat() if route.return_date is not None else ""
+
+        return "|".join(
+            [
+                route.origin,
+                route.destination,
+                route.departure_date.isoformat(),
+                return_date,
+                str(int(route.direct_only)),
+            ]
+        )
+
+    @staticmethod
+    def _to_cents(value: Decimal) -> int:
+        return int(
+            (value * CENTS_MULTIPLIER).quantize(
+                INTEGER_PRECISION,
+                rounding=ROUND_HALF_UP,
+            )
+        )
+
+    @staticmethod
+    def _from_cents(value: int) -> Decimal:
+        return (Decimal(value) / CENTS_MULTIPLIER).quantize(MONEY_PRECISION)
