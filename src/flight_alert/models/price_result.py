@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from flight_alert.models.route import Route
@@ -14,7 +14,7 @@ class PriceResult:
     airline: str
     source: str
     booking_url: str | None = None
-    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
         if self.price <= Decimal("0"):

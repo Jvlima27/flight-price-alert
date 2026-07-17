@@ -1,0 +1,95 @@
+[1mdiff --git a/src/flight_alert/database/sqlite_repository.py b/src/flight_alert/database/sqlite_repository.py[m
+[1mindex 9d43e12..43ac128 100644[m
+[1m--- a/src/flight_alert/database/sqlite_repository.py[m
+[1m+++ b/src/flight_alert/database/sqlite_repository.py[m
+[36m@@ -1,13 +1,12 @@[m
+ import sqlite3[m
+ from collections.abc import Iterator[m
+ from contextlib import contextmanager[m
+[31m-from decimal import Decimal, ROUND_HALF_UP[m
+[32m+[m[32mfrom datetime import UTC, datetime[m
+[32m+[m[32mfrom decimal import ROUND_HALF_UP, Decimal[m
+ from pathlib import Path[m
+ [m
+ from flight_alert.models import PriceResult, Route[m
+ [m
+[31m-from datetime import datetime, timezone[m
+[31m-[m
+ CENTS_MULTIPLIER = Decimal("100")[m
+ INTEGER_PRECISION = Decimal("1")[m
+ MONEY_PRECISION = Decimal("0.01")[m
+[36m@@ -190,7 +189,7 @@[m [mclass SQLitePriceRepository:[m
+                     self._to_cents(result.price),[m
+                     channel,[m
+                     reason,[m
+[31m-                    datetime.now(timezone.utc).isoformat(),[m
+[32m+[m[32m                    datetime.now(UTC).isoformat(),[m
+                 ),[m
+             )[m
+ [m
+[1mdiff --git a/src/flight_alert/models/price_result.py b/src/flight_alert/models/price_result.py[m
+[1mindex 4ba185a..3e99714 100644[m
+[1m--- a/src/flight_alert/models/price_result.py[m
+[1m+++ b/src/flight_alert/models/price_result.py[m
+[36m@@ -1,5 +1,5 @@[m
+ from dataclasses import dataclass, field[m
+[31m-from datetime import datetime, timezone[m
+[32m+[m[32mfrom datetime import UTC, datetime[m
+ from decimal import Decimal[m
+ [m
+ from flight_alert.models.route import Route[m
+[36m@@ -14,7 +14,7 @@[m [mclass PriceResult:[m
+     airline: str[m
+     source: str[m
+     booking_url: str | None = None[m
+[31m-    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))[m
+[32m+[m[32m    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))[m
+ [m
+     def __post_init__(self) -> None:[m
+         if self.price <= Decimal("0"):[m
+[1mdiff --git a/src/flight_alert/services/history_analyzer.py b/src/flight_alert/services/history_analyzer.py[m
+[1mindex 91383af..8478ebe 100644[m
+[1m--- a/src/flight_alert/services/history_analyzer.py[m
+[1m+++ b/src/flight_alert/services/history_analyzer.py[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-from decimal import Decimal, ROUND_HALF_UP[m
+[32m+[m[32mfrom decimal import ROUND_HALF_UP, Decimal[m
+ [m
+ from flight_alert.models import PriceHistoryAnalysis, PriceResult[m
+ [m
+[1mdiff --git a/src/flight_alert/services/price_analyzer.py b/src/flight_alert/services/price_analyzer.py[m
+[1mindex 7170471..4dec2ad 100644[m
+[1m--- a/src/flight_alert/services/price_analyzer.py[m
+[1m+++ b/src/flight_alert/services/price_analyzer.py[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-from decimal import Decimal, ROUND_HALF_UP[m
+[32m+[m[32mfrom decimal import ROUND_HALF_UP, Decimal[m
+ [m
+ from flight_alert.models import PriceAnalysis, PriceResult, PriceStatus[m
+ [m
+[1mdiff --git a/tests/test_sqlite_repository.py b/tests/test_sqlite_repository.py[m
+[1mindex 2e003c6..f806207 100644[m
+[1m--- a/tests/test_sqlite_repository.py[m
+[1m+++ b/tests/test_sqlite_repository.py[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-from datetime import date, datetime, timezone[m
+[32m+[m[32mfrom datetime import UTC, date, datetime[m
+ from decimal import Decimal[m
+ from pathlib import Path[m
+ [m
+[36m@@ -39,13 +39,13 @@[m [mdef test_save_and_retrieve_price_history(tmp_path: Path) -> None:[m
+     first_result = create_result([m
+         route=route,[m
+         price="2300.00",[m
+[31m-        checked_at=datetime(2026, 7, 16, 10, 0, tzinfo=timezone.utc),[m
+[32m+[m[32m        checked_at=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),[m
+     )[m
+ [m
+     second_result = create_result([m
+         route=route,[m
+         price="2100.00",[m
+[31m-        checked_at=datetime(2026, 7, 16, 11, 0, tzinfo=timezone.utc),[m
+[32m+[m[32m        checked_at=datetime(2026, 7, 16, 11, 0, tzinfo=UTC),[m
+     )[m
+ [m
+     repository.save(first_result)[m

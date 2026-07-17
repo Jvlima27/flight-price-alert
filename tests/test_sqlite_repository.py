@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -39,13 +39,13 @@ def test_save_and_retrieve_price_history(tmp_path: Path) -> None:
     first_result = create_result(
         route=route,
         price="2300.00",
-        checked_at=datetime(2026, 7, 16, 10, 0, tzinfo=timezone.utc),
+        checked_at=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),
     )
 
     second_result = create_result(
         route=route,
         price="2100.00",
-        checked_at=datetime(2026, 7, 16, 11, 0, tzinfo=timezone.utc),
+        checked_at=datetime(2026, 7, 16, 11, 0, tzinfo=UTC),
     )
 
     repository.save(first_result)

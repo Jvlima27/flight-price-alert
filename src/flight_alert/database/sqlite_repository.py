@@ -1,12 +1,11 @@
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from flight_alert.models import PriceResult, Route
-
-from datetime import datetime, timezone
 
 CENTS_MULTIPLIER = Decimal("100")
 INTEGER_PRECISION = Decimal("1")
@@ -190,7 +189,7 @@ class SQLitePriceRepository:
                     self._to_cents(result.price),
                     channel,
                     reason,
-                    datetime.now(timezone.utc).isoformat(),
+                    datetime.now(UTC).isoformat(),
                 ),
             )
 
