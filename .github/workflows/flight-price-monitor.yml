@@ -25,6 +25,9 @@ jobs:
       SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       PYTHONUNBUFFERED: "1"
+      AI_INSIGHTS_ENABLED: "true"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-3.1-flash-lite
 
     steps:
       - name: Check out repository
@@ -55,6 +58,11 @@ jobs:
 
           if [ -z "$DISCORD_WEBHOOK_URL" ]; then
             echo "::error::DISCORD_WEBHOOK_URL is not configured."
+            exit 1
+          fi
+
+          if [ "$AI_INSIGHTS_ENABLED" = "true" ] && [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY is not configured."
             exit 1
           fi
 

@@ -5,6 +5,7 @@ description = "Flight price monitoring bot with Discord and WhatsApp notificatio
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "google-genai>=2.12.1",
     "playwright>=1.61.0",
     "python-dotenv>=1.2.2",
 ]

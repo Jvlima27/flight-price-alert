@@ -16,5 +16,6 @@ class PriceAlertNotifier(ABC):
         self,
         price_analysis: PriceAnalysis,
         history_analysis: PriceHistoryAnalysis,
+        insight: str | None = None,
     ) -> None:
         """Send a flight price alert."""

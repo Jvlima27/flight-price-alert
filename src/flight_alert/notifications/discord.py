@@ -33,10 +33,12 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
         self,
         price_analysis: PriceAnalysis,
         history_analysis: PriceHistoryAnalysis,
+        insight: str | None = None,
     ) -> None:
         payload = self._build_payload(
             price_analysis=price_analysis,
             history_analysis=history_analysis,
+            insight=insight,
         )
 
         request = Request(
@@ -72,6 +74,7 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
     def _build_payload(
         price_analysis: PriceAnalysis,
         history_analysis: PriceHistoryAnalysis,
+        insight: str | None = None,
     ) -> dict[str, object]:
         result = price_analysis.result
         route = result.route
@@ -85,48 +88,60 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
             description += "\n\n🏆 Este é um novo menor preço registrado."
 
         departure = route.departure_date.strftime("%d/%m/%Y")
+
         return_date = (
             route.return_date.strftime("%d/%m/%Y")
             if route.return_date is not None
             else "Somente ida"
         )
 
+        fields: list[dict[str, object]] = [
+            {
+                "name": "Rota",
+                "value": f"{route.origin} → {route.destination}",
+                "inline": True,
+            },
+            {
+                "name": "Datas",
+                "value": f"{departure} → {return_date}",
+                "inline": True,
+            },
+            {
+                "name": "Preço encontrado",
+                "value": _format_brl(result.price),
+                "inline": True,
+            },
+            {
+                "name": "Economia sobre a meta",
+                "value": _format_brl(price_analysis.difference),
+                "inline": True,
+            },
+            {
+                "name": "Companhia",
+                "value": result.airline,
+                "inline": True,
+            },
+            {
+                "name": "Variação",
+                "value": _format_history_change(history_analysis),
+                "inline": True,
+            },
+        ]
+
+        if insight:
+            fields.append(
+                {
+                    "name": "🤖 Análise da IA",
+                    "value": insight[:1024],
+                    "inline": False,
+                }
+            )
+
         embed: dict[str, object] = {
             "title": "✈️ Passagem dentro da meta!",
             "description": description,
             "color": 5763719,
-            "fields": [
-                {
-                    "name": "Rota",
-                    "value": f"{route.origin} → {route.destination}",
-                    "inline": True,
-                },
-                {
-                    "name": "Datas",
-                    "value": f"{departure} → {return_date}",
-                    "inline": True,
-                },
-                {
-                    "name": "Preço encontrado",
-                    "value": _format_brl(result.price),
-                    "inline": True,
-                },
-                {
-                    "name": "Economia sobre a meta",
-                    "value": _format_brl(price_analysis.difference),
-                    "inline": True,
-                },
-                {
-                    "name": "Companhia",
-                    "value": result.airline,
-                    "inline": True,
-                },
-                {
-                    "name": "Variação",
-                    "value": _format_history_change(history_analysis),
-                    "inline": True,
-                },
-            ],
+            "fields": fields,
             "footer": {
                 "text": f"Fonte: {result.source}",
             },

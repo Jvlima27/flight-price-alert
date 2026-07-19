@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 
 from flight_alert.app import Application
 from flight_alert.config import ConfigurationError
+from flight_alert.insights import (
+    GeminiPriceInsightGenerator,
+    PriceInsightGenerator,
+)
 from flight_alert.notifications import (
     DiscordWebhookNotifier,
     NotificationError,
@@ -64,6 +68,36 @@ def create_notifier() -> PriceAlertNotifier | None:
     return DiscordWebhookNotifier(webhook_url=webhook_url)
 
 
+def create_insight_generator() -> PriceInsightGenerator | None:
+    enabled = os.getenv(
+        "AI_INSIGHTS_ENABLED",
+        "false",
+    ).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    if not enabled:
+        return None
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+    if not api_key:
+        raise ConfigurationError("GEMINI_API_KEY is required when AI_INSIGHTS_ENABLED=true.")
+
+    model = os.getenv(
+        "GEMINI_MODEL",
+        "gemini-3.1-flash-lite",
+    ).strip()
+
+    return GeminiPriceInsightGenerator(
+        api_key=api_key,
+        model=model,
+    )
+
+
 def main() -> None:
     configure_logging()
     load_dotenv()
@@ -72,6 +106,7 @@ def main() -> None:
         Application(
             provider=create_provider(),
             notifier=create_notifier(),
+            insight_generator=create_insight_generator(),
         ).run()
     except (
         ConfigurationError,

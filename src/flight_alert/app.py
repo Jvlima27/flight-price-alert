@@ -3,6 +3,7 @@ from pathlib import Path
 
 from flight_alert.config import load_routes
 from flight_alert.database import SQLitePriceRepository
+from flight_alert.insights import InsightError, PriceInsightGenerator
 from flight_alert.models import (
     AlertDecision,
     PriceAnalysis,
@@ -32,11 +33,13 @@ class Application:
         provider: FlightPriceProvider | None = None,
         repository: SQLitePriceRepository | None = None,
         notifier: PriceAlertNotifier | None = None,
+        insight_generator: PriceInsightGenerator | None = None,
     ) -> None:
         self.routes_file = routes_file or Path("config/routes.json")
         self.provider = provider or SimulatedFlightPriceProvider()
         self.repository = repository or SQLitePriceRepository(Path("data/flight_prices.db"))
         self.notifier = notifier
+        self.insight_generator = insight_generator
 
     def run(self) -> None:
         self.repository.initialize()
@@ -54,17 +57,21 @@ class Application:
             )
 
             previous_price = self.repository.get_latest_price(route)
+
             previous_lowest_price = self.repository.get_lowest_price(route)
+
             last_alerted_price = self.repository.get_latest_alert_price(route)
 
             result = self.provider.search(route)
 
             price_analysis = analyze_price(result)
+
             history_analysis = analyze_price_history(
                 result=result,
                 previous_price=previous_price,
                 previous_lowest_price=previous_lowest_price,
             )
+
             alert_decision = decide_alert(
                 price_analysis=price_analysis,
                 history_analysis=history_analysis,
@@ -76,6 +83,7 @@ class Application:
 
             self._log_price_analysis(price_analysis)
             self._log_history_analysis(history_analysis)
+
             self._process_alert(
                 decision=alert_decision,
                 price_analysis=price_analysis,
@@ -99,9 +107,16 @@ class Application:
             logger.warning("An alert should be sent, but no notifier is configured.")
             return
 
+        insight = self._generate_insight(
+            decision=decision,
+            price_analysis=price_analysis,
+            history_analysis=history_analysis,
+        )
+
         self.notifier.send(
             price_analysis=price_analysis,
             history_analysis=history_analysis,
+            insight=insight,
         )
 
         self.repository.save_alert(
@@ -114,6 +129,35 @@ class Application:
             "Price alert sent successfully. Reason: %s.",
             decision.reason.value,
         )
+
+    def _generate_insight(
+        self,
+        decision: AlertDecision,
+        price_analysis: PriceAnalysis,
+        history_analysis: PriceHistoryAnalysis,
+    ) -> str | None:
+        if self.insight_generator is None:
+            return None
+
+        try:
+            insight = self.insight_generator.generate(
+                price_analysis=price_analysis,
+                history_analysis=history_analysis,
+                alert_decision=decision,
+            )
+        except InsightError as exc:
+            logger.warning(
+                "AI insight could not be generated: %s",
+                exc,
+            )
+            return None
+
+        logger.info(
+            "AI insight generated successfully using %s.",
+            self.insight_generator.name,
+        )
+
+        return insight
 
     @staticmethod
     def _log_price_analysis(
