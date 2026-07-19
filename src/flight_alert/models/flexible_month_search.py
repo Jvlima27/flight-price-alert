@@ -17,6 +17,7 @@ class FlexibleMonthSearch:
     maximum_trip_days: int
     target_price: Decimal
     direct_only: bool = False
+    minimum_alert_drop: Decimal = Decimal("50.00")
 
     def __post_init__(self) -> None:
         self._validate_airport_code("origin", self.origin)
@@ -45,6 +46,9 @@ class FlexibleMonthSearch:
         if self.target_price <= Decimal("0"):
             raise ValueError("Target price must be greater than zero.")
 
+        if self.minimum_alert_drop < Decimal("0"):
+            raise ValueError("Minimum alert drop cannot be negative.")
+
     @property
     def outbound_start_date(self) -> date:
         return date(self.year, self.month, 1)
@@ -54,6 +58,23 @@ class FlexibleMonthSearch:
         last_day = monthrange(self.year, self.month)[1]
 
         return date(self.year, self.month, last_day)
+
+    @property
+    def monitor_key(self) -> str:
+        """Return a stable identifier for this flexible search."""
+
+        airports = ",".join(sorted(self.destination_airports))
+
+        return "|".join(
+            [
+                "flexible-month",
+                self.origin,
+                airports,
+                f"{self.year:04d}-{self.month:02d}",
+                (f"{self.minimum_trip_days}-{self.maximum_trip_days}"),
+                str(int(self.direct_only)),
+            ]
+        )
 
     @staticmethod
     def _validate_airport_code(

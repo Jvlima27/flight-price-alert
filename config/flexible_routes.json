@@ -9,7 +9,8 @@
       "minimum_trip_days": 5,
       "maximum_trip_days": 15,
       "target_price": "2500.00",
-      "direct_only": false
+      "direct_only": false,
+      "minimum_alert_drop": "50.00"
     }
   ]
 }

@@ -2,9 +2,16 @@ import logging
 from pathlib import Path
 
 from flight_alert.config import load_flexible_searches
+from flight_alert.database import SQLitePriceRepository
+from flight_alert.insights import PriceInsightGenerator
+from flight_alert.notifications import PriceAlertNotifier
 from flight_alert.providers import (
     FlexibleFlightDealsProvider,
     NoFlightResultsError,
+)
+from flight_alert.services import (
+    PriceMonitoringEngine,
+    convert_flexible_deal_to_price_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -17,11 +24,26 @@ class FlexibleDealsApplication:
         self,
         provider: FlexibleFlightDealsProvider,
         searches_file: Path | None = None,
+        repository: SQLitePriceRepository | None = None,
+        notifier: PriceAlertNotifier | None = None,
+        insight_generator: PriceInsightGenerator | None = None,
+        engine: PriceMonitoringEngine | None = None,
     ) -> None:
         self.provider = provider
+
         self.searches_file = searches_file or Path("config/flexible_routes.json")
 
+        repository_instance = repository or SQLitePriceRepository(Path("data/flight_prices.db"))
+
+        self.engine = engine or PriceMonitoringEngine(
+            repository=repository_instance,
+            notifier=notifier,
+            insight_generator=insight_generator,
+        )
+
     def run(self) -> None:
+        self.engine.initialize()
+
         searches = load_flexible_searches(self.searches_file)
 
         logger.info(
@@ -46,7 +68,7 @@ class FlexibleDealsApplication:
             )
 
             try:
-                result = self.provider.search(search)
+                deal = self.provider.search(search)
             except NoFlightResultsError as exc:
                 logger.warning(
                     "No matching flexible deal: %s",
@@ -55,23 +77,14 @@ class FlexibleDealsApplication:
                 continue
 
             logger.info(
-                "Cheapest flexible deal: %s -> %s | "
-                "departure=%s | return=%s | days=%d | "
-                "airline=%s | price=R$ %.2f | target=R$ %.2f",
-                result.origin,
-                result.destination,
-                result.departure_date,
-                result.return_date,
-                result.trip_days,
-                result.airline,
-                result.price,
-                search.target_price,
+                "Flexible deal selected: %s -> %s | departure=%s | return=%s | days=%d.",
+                deal.origin,
+                deal.destination,
+                deal.departure_date,
+                deal.return_date,
+                deal.trip_days,
             )
 
-            if result.price <= search.target_price:
-                logger.info("Flexible deal reached the configured target.")
-            else:
-                logger.info(
-                    "Flexible deal is R$ %.2f above the target.",
-                    result.price - search.target_price,
-                )
+            result = convert_flexible_deal_to_price_result(deal)
+
+            self.engine.process(result)

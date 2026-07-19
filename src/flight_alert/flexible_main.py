@@ -7,17 +7,16 @@ from flight_alert.config import ConfigurationError
 from flight_alert.flexible_app import (
     FlexibleDealsApplication,
 )
+from flight_alert.main import (
+    configure_logging,
+    create_insight_generator,
+    create_notifier,
+)
+from flight_alert.notifications import NotificationError
 from flight_alert.providers import (
     ProviderError,
     SerpApiFlexibleDealsProvider,
 )
-
-
-def configure_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s | %(message)s",
-    )
 
 
 def main() -> None:
@@ -34,8 +33,16 @@ def main() -> None:
         raise SystemExit(1)
 
     try:
-        FlexibleDealsApplication(provider=SerpApiFlexibleDealsProvider(api_key=api_key)).run()
-    except (ConfigurationError, ProviderError) as exc:
+        FlexibleDealsApplication(
+            provider=SerpApiFlexibleDealsProvider(api_key=api_key),
+            notifier=create_notifier(),
+            insight_generator=create_insight_generator(),
+        ).run()
+    except (
+        ConfigurationError,
+        NotificationError,
+        ProviderError,
+    ) as exc:
         logging.getLogger(__name__).error("%s", exc)
         raise SystemExit(1) from exc
 

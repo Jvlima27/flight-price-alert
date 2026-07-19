@@ -78,6 +78,14 @@ def _parse_flexible_search(
             maximum_trip_days=int(raw_search["maximum_trip_days"]),
             target_price=Decimal(str(raw_search["target_price"])),
             direct_only=direct_only,
+            minimum_alert_drop=Decimal(
+                str(
+                    raw_search.get(
+                        "minimum_alert_drop",
+                        "50.00",
+                    )
+                )
+            ),
         )
     except KeyError as exc:
         missing_field = exc.args[0]

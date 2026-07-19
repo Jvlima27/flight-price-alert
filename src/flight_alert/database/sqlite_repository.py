@@ -96,7 +96,7 @@ class SQLitePriceRepository:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    self._create_route_key(route),
+                    self._create_result_key(result),
                     route.origin,
                     route.destination,
                     route.departure_date.isoformat(),
@@ -111,7 +111,11 @@ class SQLitePriceRepository:
                 ),
             )
 
-    def get_latest_price(self, route: Route) -> Decimal | None:
+    def get_latest_price(
+        self,
+        route: Route,
+        monitor_key: str | None = None,
+    ) -> Decimal | None:
         """Return the most recently recorded price for a route."""
 
         with self._connection() as connection:
@@ -123,7 +127,12 @@ class SQLitePriceRepository:
                 ORDER BY checked_at DESC, id DESC
                 LIMIT 1
                 """,
-                (self._create_route_key(route),),
+                (
+                    self._create_route_key(
+                        route,
+                        monitor_key=monitor_key,
+                    ),
+                ),
             ).fetchone()
 
         if row is None:
@@ -131,7 +140,11 @@ class SQLitePriceRepository:
 
         return self._from_cents(row[0])
 
-    def get_lowest_price(self, route: Route) -> Decimal | None:
+    def get_lowest_price(
+        self,
+        route: Route,
+        monitor_key: str | None = None,
+    ) -> Decimal | None:
         """Return the lowest previously recorded price for a route."""
 
         with self._connection() as connection:
@@ -141,7 +154,12 @@ class SQLitePriceRepository:
                 FROM price_history
                 WHERE route_key = ?
                 """,
-                (self._create_route_key(route),),
+                (
+                    self._create_route_key(
+                        route,
+                        monitor_key=monitor_key,
+                    ),
+                ),
             ).fetchone()
 
         if row is None or row[0] is None:
@@ -149,7 +167,11 @@ class SQLitePriceRepository:
 
         return self._from_cents(row[0])
 
-    def count(self, route: Route) -> int:
+    def count(
+        self,
+        route: Route,
+        monitor_key: str | None = None,
+    ) -> int:
         """Return the number of saved results for a route."""
 
         with self._connection() as connection:
@@ -159,7 +181,12 @@ class SQLitePriceRepository:
                 FROM price_history
                 WHERE route_key = ?
                 """,
-                (self._create_route_key(route),),
+                (
+                    self._create_route_key(
+                        route,
+                        monitor_key=monitor_key,
+                    ),
+                ),
             ).fetchone()
 
         return int(row[0])
@@ -185,7 +212,7 @@ class SQLitePriceRepository:
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
-                    self._create_route_key(result.route),
+                    self._create_result_key(result),
                     self._to_cents(result.price),
                     channel,
                     reason,
@@ -196,6 +223,7 @@ class SQLitePriceRepository:
     def get_latest_alert_price(
         self,
         route: Route,
+        monitor_key: str | None = None,
     ) -> Decimal | None:
         """Return the price used in the latest sent alert."""
 
@@ -208,7 +236,12 @@ class SQLitePriceRepository:
                 ORDER BY sent_at DESC, id DESC
                 LIMIT 1
                 """,
-                (self._create_route_key(route),),
+                (
+                    self._create_route_key(
+                        route,
+                        monitor_key=monitor_key,
+                    ),
+                ),
             ).fetchone()
 
         if row is None:
@@ -216,7 +249,11 @@ class SQLitePriceRepository:
 
         return self._from_cents(row[0])
 
-    def count_alerts(self, route: Route) -> int:
+    def count_alerts(
+        self,
+        route: Route,
+        monitor_key: str | None = None,
+    ) -> int:
         """Return the number of alerts sent for a route."""
 
         with self._connection() as connection:
@@ -226,7 +263,12 @@ class SQLitePriceRepository:
                 FROM alert_history
                 WHERE route_key = ?
                 """,
-                (self._create_route_key(route),),
+                (
+                    self._create_route_key(
+                        route,
+                        monitor_key=monitor_key,
+                    ),
+                ),
             ).fetchone()
 
         return int(row[0])
@@ -247,7 +289,13 @@ class SQLitePriceRepository:
             connection.close()
 
     @staticmethod
-    def _create_route_key(route: Route) -> str:
+    def _create_route_key(
+        route: Route,
+        monitor_key: str | None = None,
+    ) -> str:
+        if monitor_key is not None:
+            return monitor_key
+
         return_date = route.return_date.isoformat() if route.return_date is not None else ""
 
         return "|".join(
@@ -258,6 +306,16 @@ class SQLitePriceRepository:
                 return_date,
                 str(int(route.direct_only)),
             ]
+        )
+
+    @classmethod
+    def _create_result_key(
+        cls,
+        result: PriceResult,
+    ) -> str:
+        return cls._create_route_key(
+            route=result.route,
+            monitor_key=result.monitor_key,
         )
 
     @staticmethod

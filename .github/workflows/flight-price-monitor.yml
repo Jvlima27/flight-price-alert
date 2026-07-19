@@ -74,8 +74,11 @@ jobs:
           restore-keys: |
             flight-price-state-
 
-      - name: Run flight price monitor
+      - name: Run exact-date flight monitor
         run: uv run flight-alert
+
+      - name: Run flexible-month flight monitor
+        run: uv run flight-alert-flexible
 
       - name: Save price history
         if: success()

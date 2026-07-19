@@ -13,6 +13,7 @@ class PriceResult:
     price: Decimal
     airline: str
     source: str
+    monitor_key: str | None = None
     booking_url: str | None = None
     checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -25,3 +26,6 @@ class PriceResult:
 
         if not self.source.strip():
             raise ValueError("Source cannot be empty.")
+
+        if self.monitor_key is not None and not self.monitor_key.strip():
+            raise ValueError("Monitor key cannot be empty.")
