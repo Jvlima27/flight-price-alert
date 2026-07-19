@@ -13,6 +13,7 @@ from flight_alert.models import (
 from flight_alert.notifications import PriceAlertNotifier
 from flight_alert.providers import (
     FlightPriceProvider,
+    NoFlightResultsError,
     SimulatedFlightPriceProvider,
 )
 from flight_alert.services import (
@@ -62,7 +63,16 @@ class Application:
 
             last_alerted_price = self.repository.get_latest_alert_price(route)
 
-            result = self.provider.search(route)
+            try:
+                result = self.provider.search(route)
+            except NoFlightResultsError as exc:
+                logger.warning(
+                    "No flight results for %s -> %s: %s",
+                    route.origin,
+                    route.destination,
+                    exc,
+                )
+                continue
 
             price_analysis = analyze_price(result)
 

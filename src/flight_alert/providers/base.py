@@ -7,6 +7,10 @@ class ProviderError(RuntimeError):
     """Raised when a price provider cannot complete a search."""
 
 
+class NoFlightResultsError(ProviderError):
+    """Raised when a valid search returns no flight offers."""
+
+
 class FlightPriceProvider(ABC):
     """Base interface for flight price providers."""
 

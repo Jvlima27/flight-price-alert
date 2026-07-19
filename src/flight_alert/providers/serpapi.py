@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from flight_alert.models import PriceResult, Route
 from flight_alert.providers.base import (
     FlightPriceProvider,
+    NoFlightResultsError,
     ProviderError,
 )
 
@@ -20,7 +21,7 @@ class SerpApiFlightPriceProvider(FlightPriceProvider):
     def __init__(
         self,
         api_key: str,
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float = 60.0,
     ) -> None:
         if not api_key.strip():
             raise ValueError("SerpApi API key cannot be empty.")
@@ -49,7 +50,7 @@ class SerpApiFlightPriceProvider(FlightPriceProvider):
         offers = self._extract_offers(payload)
 
         if not offers:
-            raise ProviderError(
+            raise NoFlightResultsError(
                 f"No flight offers were found for {route.origin} -> {route.destination}."
             )
 
@@ -83,6 +84,7 @@ class SerpApiFlightPriceProvider(FlightPriceProvider):
             "adults": 1,
             "sort_by": 2,
             "stops": 1 if route.direct_only else 0,
+            "deep_search": "true",
         }
 
         if route.return_date is None:
@@ -118,6 +120,14 @@ class SerpApiFlightPriceProvider(FlightPriceProvider):
         error_message = payload.get("error")
 
         if isinstance(error_message, str):
+            normalized_error = error_message.casefold()
+
+            if (
+                "hasn't returned any results" in normalized_error
+                or "no results" in normalized_error
+            ):
+                raise NoFlightResultsError(error_message)
+
             raise ProviderError(f"SerpApi returned an error: {error_message}")
 
         return payload
