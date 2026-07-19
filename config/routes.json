@@ -2,10 +2,10 @@
   "routes": [
     {
       "origin": "VIX",
-      "destination": "SCL",
-      "departure_date": "2026-10-15",
-      "return_date": "2026-10-22",
-      "target_price": "2500.00",
+      "destination": "EZE",
+      "departure_date": "2027-06-12",
+      "return_date": "2027-06-21",
+      "target_price": "1800.00",
       "direct_only": false,
       "minimum_alert_drop": "50.00"
     }
