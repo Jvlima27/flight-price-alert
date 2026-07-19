@@ -15,7 +15,7 @@ from flight_alert.main import (
 from flight_alert.notifications import NotificationError
 from flight_alert.providers import (
     ProviderError,
-    SerpApiFlexibleDealsProvider,
+    SerpApiFlexibleGridProvider,
 )
 
 
@@ -34,7 +34,7 @@ def main() -> None:
 
     try:
         FlexibleDealsApplication(
-            provider=SerpApiFlexibleDealsProvider(api_key=api_key),
+            provider=SerpApiFlexibleGridProvider(api_key=api_key),
             notifier=create_notifier(),
             insight_generator=create_insight_generator(),
         ).run()

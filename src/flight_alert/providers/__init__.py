@@ -9,8 +9,8 @@ from flight_alert.providers.flexible_base import (
 from flight_alert.providers.serpapi import (
     SerpApiFlightPriceProvider,
 )
-from flight_alert.providers.serpapi_deals import (
-    SerpApiFlexibleDealsProvider,
+from flight_alert.providers.serpapi_flexible_grid import (
+    SerpApiFlexibleGridProvider,
 )
 from flight_alert.providers.simulated import (
     SimulatedFlightPriceProvider,
@@ -23,5 +23,5 @@ __all__ = [
     "SerpApiFlightPriceProvider",
     "SimulatedFlightPriceProvider",
     "FlexibleFlightDealsProvider",
-    "SerpApiFlexibleDealsProvider",
+    "SerpApiFlexibleGridProvider",
 ]

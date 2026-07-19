@@ -2,6 +2,9 @@ from flight_alert.models.alert_decision import (
     AlertDecision,
     AlertReason,
 )
+from flight_alert.models.flexible_date_option import (
+    FlexibleDateOption,
+)
 from flight_alert.models.flexible_deal_result import (
     FlexibleDealResult,
 )
@@ -25,6 +28,7 @@ __all__ = [
     "PriceHistoryAnalysis",
     "FlexibleDealResult",
     "FlexibleMonthSearch",
+    "FlexibleDateOption",
     "PriceResult",
     "PriceStatus",
     "Route",

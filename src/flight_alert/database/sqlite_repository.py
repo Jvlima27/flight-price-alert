@@ -71,6 +71,16 @@ class SQLitePriceRepository:
                 """
             )
 
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS monitor_cursor (
+                    monitor_key TEXT PRIMARY KEY,
+                    position INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+
     def save(self, result: PriceResult) -> None:
         """Save a price result in the history."""
 
@@ -272,6 +282,83 @@ class SQLitePriceRepository:
             ).fetchone()
 
         return int(row[0])
+
+    def get_cursor_position(
+        self,
+        monitor_key: str,
+        option_count: int,
+    ) -> int:
+        """Return the next date-grid position to search."""
+
+        if not monitor_key.strip():
+            raise ValueError("Monitor key cannot be empty.")
+
+        if option_count <= 0:
+            raise ValueError("Option count must be greater than zero.")
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT position
+                FROM monitor_cursor
+                WHERE monitor_key = ?
+                """,
+                (monitor_key,),
+            ).fetchone()
+
+        if row is None:
+            return 0
+
+        return int(row[0]) % option_count
+
+    def advance_cursor(
+        self,
+        monitor_key: str,
+        option_count: int,
+    ) -> int:
+        """Advance and persist the date-grid cursor."""
+
+        if not monitor_key.strip():
+            raise ValueError("Monitor key cannot be empty.")
+
+        if option_count <= 0:
+            raise ValueError("Option count must be greater than zero.")
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                SELECT position
+                FROM monitor_cursor
+                WHERE monitor_key = ?
+                """,
+                (monitor_key,),
+            ).fetchone()
+
+            current_position = int(row[0]) % option_count if row is not None else 0
+
+            next_position = (current_position + 1) % option_count
+
+            connection.execute(
+                """
+                INSERT INTO monitor_cursor (
+                    monitor_key,
+                    position,
+                    updated_at
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT(monitor_key)
+                DO UPDATE SET
+                    position = excluded.position,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    monitor_key,
+                    next_position,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+        return next_position
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:

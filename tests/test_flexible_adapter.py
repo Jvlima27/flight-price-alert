@@ -16,9 +16,9 @@ def test_flexible_deal_uses_stable_monitor_key() -> None:
         destination_name="Buenos Aires",
         destination_airports=("AEP", "EZE"),
         year=2027,
-        month=6,
-        minimum_trip_days=5,
-        maximum_trip_days=15,
+        month=5,
+        departure_days=(1, 6, 11),
+        trip_lengths=(5, 8, 12),
         target_price=Decimal("2500.00"),
     )
 
@@ -27,26 +27,23 @@ def test_flexible_deal_uses_stable_monitor_key() -> None:
         price=Decimal("1800.00"),
         origin="VIX",
         destination="AEP",
-        departure_date=date(2027, 6, 8),
-        return_date=date(2027, 6, 15),
+        departure_date=date(2027, 5, 6),
+        return_date=date(2027, 5, 14),
         airline="Test Air",
         source="test",
     )
 
     result = convert_flexible_deal_to_price_result(deal)
 
-    assert result.monitor_key == ("flexible-month|VIX|AEP,EZE|2027-06|5-15|0")
-
+    assert result.monitor_key == search.monitor_key
     assert result.route.departure_date == date(
         2027,
+        5,
         6,
-        8,
     )
-
     assert result.route.return_date == date(
         2027,
-        6,
-        15,
+        5,
+        14,
     )
-
     assert result.route.target_price == Decimal("2500.00")

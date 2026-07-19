@@ -3,8 +3,8 @@
     {
       "origin": "VIX",
       "destination": "EZE",
-      "departure_date": "2027-06-14",
-      "return_date": "2027-06-22",
+      "departure_date": "2027-06-01",
+      "return_date": "2027-06-10",
       "target_price": "2500.00",
       "direct_only": false,
       "minimum_alert_drop": "50.00"

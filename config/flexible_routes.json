@@ -6,8 +6,8 @@
       "destination_airports": ["AEP", "EZE"],
       "year": 2027,
       "month": 6,
-      "minimum_trip_days": 5,
-      "maximum_trip_days": 15,
+      "departure_days": [1, 6, 11, 16, 21, 26, 30],
+      "trip_lengths": [5, 8, 12],
       "target_price": "2500.00",
       "direct_only": false,
       "minimum_alert_drop": "50.00"

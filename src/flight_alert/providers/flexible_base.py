@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
 
 from flight_alert.models import (
+    FlexibleDateOption,
     FlexibleDealResult,
     FlexibleMonthSearch,
 )
 
 
 class FlexibleFlightDealsProvider(ABC):
-    """Base interface for flexible flight deals providers."""
+    """Base interface for rotating flexible searches."""
 
     @property
     @abstractmethod
@@ -18,5 +19,6 @@ class FlexibleFlightDealsProvider(ABC):
     def search(
         self,
         search: FlexibleMonthSearch,
+        date_option: FlexibleDateOption,
     ) -> FlexibleDealResult:
-        """Search for the cheapest matching flexible deal."""
+        """Search one exact combination from the date grid."""

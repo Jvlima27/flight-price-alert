@@ -1,20 +1,24 @@
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+
+from flight_alert.models.flexible_date_option import (
+    FlexibleDateOption,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class FlexibleMonthSearch:
-    """A flexible flight search within a calendar month."""
+    """A rotating grid of flight dates within a calendar month."""
 
     origin: str
     destination_name: str
     destination_airports: tuple[str, ...]
     year: int
     month: int
-    minimum_trip_days: int
-    maximum_trip_days: int
+    departure_days: tuple[int, ...]
+    trip_lengths: tuple[int, ...]
     target_price: Decimal
     direct_only: bool = False
     minimum_alert_drop: Decimal = Decimal("50.00")
@@ -34,14 +38,34 @@ class FlexibleMonthSearch:
                 airport,
             )
 
+        if len(set(self.destination_airports)) != len(self.destination_airports):
+            raise ValueError("Destination airports cannot contain duplicates.")
+
         if not 1 <= self.month <= 12:
             raise ValueError("Month must be between 1 and 12.")
 
-        if self.minimum_trip_days < 1:
-            raise ValueError("Minimum trip days must be at least one.")
+        if not self.departure_days:
+            raise ValueError("At least one departure day is required.")
 
-        if self.maximum_trip_days < self.minimum_trip_days:
-            raise ValueError("Maximum trip days cannot be lower than minimum trip days.")
+        if len(set(self.departure_days)) != len(self.departure_days):
+            raise ValueError("Departure days cannot contain duplicates.")
+
+        last_day = monthrange(self.year, self.month)[1]
+
+        for departure_day in self.departure_days:
+            if not 1 <= departure_day <= last_day:
+                raise ValueError(
+                    f"Departure day must be between 1 and {last_day} for the selected month."
+                )
+
+        if not self.trip_lengths:
+            raise ValueError("At least one trip length is required.")
+
+        if len(set(self.trip_lengths)) != len(self.trip_lengths):
+            raise ValueError("Trip lengths cannot contain duplicates.")
+
+        if any(length < 1 for length in self.trip_lengths):
+            raise ValueError("Every trip length must be at least one day.")
 
         if self.target_price <= Decimal("0"):
             raise ValueError("Target price must be greater than zero.")
@@ -50,28 +74,46 @@ class FlexibleMonthSearch:
             raise ValueError("Minimum alert drop cannot be negative.")
 
     @property
-    def outbound_start_date(self) -> date:
-        return date(self.year, self.month, 1)
+    def date_options(self) -> tuple[FlexibleDateOption, ...]:
+        """Return every configured date combination."""
 
-    @property
-    def outbound_end_date(self) -> date:
-        last_day = monthrange(self.year, self.month)[1]
+        options: list[FlexibleDateOption] = []
 
-        return date(self.year, self.month, last_day)
+        for departure_day in sorted(self.departure_days):
+            departure_date = date(
+                self.year,
+                self.month,
+                departure_day,
+            )
+
+            for trip_length in sorted(self.trip_lengths):
+                options.append(
+                    FlexibleDateOption(
+                        departure_date=departure_date,
+                        return_date=(departure_date + timedelta(days=trip_length)),
+                    )
+                )
+
+        return tuple(options)
 
     @property
     def monitor_key(self) -> str:
-        """Return a stable identifier for this flexible search."""
+        """Return a stable identifier for the date grid."""
 
         airports = ",".join(sorted(self.destination_airports))
 
+        departure_days = ",".join(str(day) for day in sorted(self.departure_days))
+
+        trip_lengths = ",".join(str(length) for length in sorted(self.trip_lengths))
+
         return "|".join(
             [
-                "flexible-month",
+                "flexible-grid",
                 self.origin,
                 airports,
                 f"{self.year:04d}-{self.month:02d}",
-                (f"{self.minimum_trip_days}-{self.maximum_trip_days}"),
+                f"days={departure_days}",
+                f"stays={trip_lengths}",
                 str(int(self.direct_only)),
             ]
         )

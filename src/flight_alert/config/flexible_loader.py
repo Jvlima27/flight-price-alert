@@ -10,7 +10,7 @@ from flight_alert.models import FlexibleMonthSearch
 def load_flexible_searches(
     file_path: Path,
 ) -> list[FlexibleMonthSearch]:
-    """Load flexible monthly searches from a JSON file."""
+    """Load rotating flexible searches from a JSON file."""
 
     try:
         with file_path.open(encoding="utf-8") as file:
@@ -49,14 +49,23 @@ def _parse_flexible_search(
         raise ConfigurationError(f"Flexible search {index} must be an object.")
 
     try:
-        raw_airports = raw_search["destination_airports"]
+        destination_airports = _parse_string_list(
+            value=raw_search["destination_airports"],
+            field_name="destination_airports",
+            index=index,
+        )
 
-        if not isinstance(raw_airports, list):
-            raise ConfigurationError(
-                f"Flexible search {index}: 'destination_airports' must be a list."
-            )
+        departure_days = _parse_integer_list(
+            value=raw_search["departure_days"],
+            field_name="departure_days",
+            index=index,
+        )
 
-        destination_airports = tuple(str(airport).strip().upper() for airport in raw_airports)
+        trip_lengths = _parse_integer_list(
+            value=raw_search["trip_lengths"],
+            field_name="trip_lengths",
+            index=index,
+        )
 
         direct_only = raw_search.get(
             "direct_only",
@@ -74,8 +83,8 @@ def _parse_flexible_search(
             destination_airports=destination_airports,
             year=int(raw_search["year"]),
             month=int(raw_search["month"]),
-            minimum_trip_days=int(raw_search["minimum_trip_days"]),
-            maximum_trip_days=int(raw_search["maximum_trip_days"]),
+            departure_days=departure_days,
+            trip_lengths=trip_lengths,
             target_price=Decimal(str(raw_search["target_price"])),
             direct_only=direct_only,
             minimum_alert_drop=Decimal(
@@ -100,4 +109,40 @@ def _parse_flexible_search(
     ) as exc:
         raise ConfigurationError(
             f"Flexible search {index} contains an invalid value: {exc}"
+        ) from exc
+
+
+def _parse_string_list(
+    value: Any,
+    field_name: str,
+    index: int,
+) -> tuple[str, ...]:
+    if not isinstance(value, list) or not value:
+        raise ConfigurationError(
+            f"Flexible search {index}: '{field_name}' must be a non-empty list."
+        )
+
+    return tuple(str(item).strip().upper() for item in value)
+
+
+def _parse_integer_list(
+    value: Any,
+    field_name: str,
+    index: int,
+) -> tuple[int, ...]:
+    if not isinstance(value, list) or not value:
+        raise ConfigurationError(
+            f"Flexible search {index}: '{field_name}' must be a non-empty list."
+        )
+
+    if any(isinstance(item, bool) for item in value):
+        raise ConfigurationError(
+            f"Flexible search {index}: '{field_name}' must contain only integers."
+        )
+
+    try:
+        return tuple(int(item) for item in value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError(
+            f"Flexible search {index}: '{field_name}' must contain only integers."
         ) from exc

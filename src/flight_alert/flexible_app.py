@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class FlexibleDealsApplication:
-    """Application for flexible monthly flight searches."""
+    """Application for rotating flexible date searches."""
 
     def __init__(
         self,
@@ -33,10 +33,10 @@ class FlexibleDealsApplication:
 
         self.searches_file = searches_file or Path("config/flexible_routes.json")
 
-        repository_instance = repository or SQLitePriceRepository(Path("data/flight_prices.db"))
+        self.repository = repository or SQLitePriceRepository(Path("data/flight_prices.db"))
 
         self.engine = engine or PriceMonitoringEngine(
-            repository=repository_instance,
+            repository=self.repository,
             notifier=notifier,
             insight_generator=insight_generator,
         )
@@ -52,29 +52,60 @@ class FlexibleDealsApplication:
         )
 
         logger.info(
-            "Using flexible deals provider: %s.",
+            "Using flexible provider: %s.",
             self.provider.name,
         )
 
         for search in searches:
+            options = search.date_options
+            option_count = len(options)
+
+            cursor_position = self.repository.get_cursor_position(
+                monitor_key=search.monitor_key,
+                option_count=option_count,
+            )
+
+            date_option = options[cursor_position]
+
             logger.info(
-                "Searching flexible deals: %s -> %s | %s to %s | %d-%d days.",
+                "Flexible grid option %d/%d: %s -> %s | departure=%s | return=%s | days=%d.",
+                cursor_position + 1,
+                option_count,
                 search.origin,
                 search.destination_name,
-                search.outbound_start_date,
-                search.outbound_end_date,
-                search.minimum_trip_days,
-                search.maximum_trip_days,
+                date_option.departure_date,
+                date_option.return_date,
+                date_option.trip_days,
             )
 
             try:
-                deal = self.provider.search(search)
+                deal = self.provider.search(
+                    search=search,
+                    date_option=date_option,
+                )
             except NoFlightResultsError as exc:
+                next_position = self.repository.advance_cursor(
+                    monitor_key=search.monitor_key,
+                    option_count=option_count,
+                )
+
                 logger.warning(
-                    "No matching flexible deal: %s",
+                    "No results for this date combination: %s",
                     exc,
                 )
+
+                logger.info(
+                    "Flexible cursor advanced to option %d/%d.",
+                    next_position + 1,
+                    option_count,
+                )
+
                 continue
+
+            next_position = self.repository.advance_cursor(
+                monitor_key=search.monitor_key,
+                option_count=option_count,
+            )
 
             logger.info(
                 "Flexible deal selected: %s -> %s | departure=%s | return=%s | days=%d.",
@@ -83,6 +114,12 @@ class FlexibleDealsApplication:
                 deal.departure_date,
                 deal.return_date,
                 deal.trip_days,
+            )
+
+            logger.info(
+                "Flexible cursor advanced to option %d/%d.",
+                next_position + 1,
+                option_count,
             )
 
             result = convert_flexible_deal_to_price_result(deal)
