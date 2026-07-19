@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 flight-alert = "flight_alert.main:main"
+flight-alert-flexible = "flight_alert.flexible_main:main"
 
 [build-system]
 requires = ["uv_build>=0.11.29,<0.12"]

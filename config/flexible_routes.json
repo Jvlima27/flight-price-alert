@@ -1,0 +1,15 @@
+{
+  "searches": [
+    {
+      "origin": "VIX",
+      "destination_name": "Buenos Aires",
+      "destination_airports": ["AEP", "EZE"],
+      "year": 2027,
+      "month": 6,
+      "minimum_trip_days": 5,
+      "maximum_trip_days": 15,
+      "target_price": "2500.00",
+      "direct_only": false
+    }
+  ]
+}
