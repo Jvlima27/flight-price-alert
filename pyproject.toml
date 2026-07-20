@@ -1,7 +1,7 @@
 [project]
 name = "flight-price-alert"
 version = "0.1.0"
-description = "Flight price monitoring bot with Discord and WhatsApp notifications."
+description = "Automated flight price monitoring with Discord alerts, flexible date searches and optional AI insights."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
