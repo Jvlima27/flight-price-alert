@@ -61,3 +61,45 @@ def test_send_discord_price_alert(
     assert "VIX → SCL" in field_values
     assert "R$ 2.199,90" in field_values
     assert "Test Air" in field_values
+
+
+def test_build_flexible_discord_payload() -> None:
+    route = Route(
+        origin="VIX",
+        destination="EZE",
+        departure_date=date(2027, 6, 1),
+        return_date=date(2027, 6, 9),
+        target_price=Decimal("2500.00"),
+    )
+
+    result = PriceResult(
+        route=route,
+        price=Decimal("2297.00"),
+        airline="Gol",
+        source=("serpapi_google_flights_flexible_grid"),
+        monitor_key=("flexible-grid|VIX|AEP,EZE|2027-06|days=1,6,11|stays=5,8,12|0"),
+    )
+
+    price_analysis = analyze_price(result)
+
+    history_analysis = analyze_price_history(
+        result=result,
+        previous_price=None,
+        previous_lowest_price=None,
+    )
+
+    payload = DiscordWebhookNotifier._build_payload(
+        price_analysis=price_analysis,
+        history_analysis=history_analysis,
+    )
+
+    embed = payload["embeds"][0]
+
+    assert embed["title"] == "🔎 Oferta flexível dentro da meta!"
+
+    fields = {field["name"]: field["value"] for field in embed["fields"]}
+
+    assert fields["Tipo de busca"] == "Grade flexível rotativa"
+
+    assert fields["Duração"] == "8 dias"
+    assert fields["Preço encontrado"] == "R$ 2.297,00"

@@ -79,10 +79,28 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
         result = price_analysis.result
         route = result.route
 
-        description = (
-            "Encontramos uma passagem dentro da meta configurada "
-            f"de {_format_brl(route.target_price)}."
-        )
+        is_flexible = _is_flexible_monitor(result.monitor_key)
+
+        if is_flexible:
+            title = "🔎 Oferta flexível dentro da meta!"
+
+            description = (
+                "Encontramos uma combinação de datas da "
+                "grade flexível dentro da meta configurada "
+                f"de {_format_brl(route.target_price)}."
+            )
+
+            color = 3447003
+        else:
+            title = "✈️ Passagem dentro da meta!"
+
+            description = (
+                "Encontramos uma passagem dentro da "
+                "meta configurada "
+                f"de {_format_brl(route.target_price)}."
+            )
+
+            color = 5763719
 
         if history_analysis.is_new_lowest:
             description += "\n\n🏆 Este é um novo menor preço registrado."
@@ -95,20 +113,45 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
             else "Somente ida"
         )
 
+        trip_duration = (
+            (route.return_date - route.departure_date).days
+            if route.return_date is not None
+            else None
+        )
+
+        search_type = "Grade flexível rotativa" if is_flexible else "Datas exatas"
+
+        duration_text = f"{trip_duration} dias" if trip_duration is not None else "Somente ida"
+
         fields: list[dict[str, object]] = [
             {
                 "name": "Rota",
-                "value": f"{route.origin} → {route.destination}",
+                "value": (f"{route.origin} → {route.destination}"),
+                "inline": True,
+            },
+            {
+                "name": "Tipo de busca",
+                "value": search_type,
                 "inline": True,
             },
             {
                 "name": "Datas",
-                "value": f"{departure} → {return_date}",
+                "value": (f"{departure} → {return_date}"),
+                "inline": True,
+            },
+            {
+                "name": "Duração",
+                "value": duration_text,
                 "inline": True,
             },
             {
                 "name": "Preço encontrado",
                 "value": _format_brl(result.price),
+                "inline": True,
+            },
+            {
+                "name": "Meta configurada",
+                "value": _format_brl(route.target_price),
                 "inline": True,
             },
             {
@@ -137,13 +180,18 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
                 }
             )
 
+        footer_text = f"Fonte: {result.source}"
+
+        if is_flexible:
+            footer_text += " • Scanner rotativo"
+
         embed: dict[str, object] = {
-            "title": "✈️ Passagem dentro da meta!",
+            "title": title,
             "description": description,
-            "color": 5763719,
+            "color": color,
             "fields": fields,
             "footer": {
-                "text": f"Fonte: {result.source}",
+                "text": footer_text,
             },
             "timestamp": result.checked_at.isoformat(),
         }
@@ -158,6 +206,15 @@ class DiscordWebhookNotifier(PriceAlertNotifier):
             },
             "embeds": [embed],
         }
+
+
+def _is_flexible_monitor(
+    monitor_key: str | None,
+) -> bool:
+    if monitor_key is None:
+        return False
+
+    return monitor_key.startswith("flexible-grid|")
 
 
 def _format_brl(value: Decimal) -> str:
